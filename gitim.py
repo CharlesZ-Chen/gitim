@@ -10,6 +10,8 @@ from functools import partial
 from platform import python_version_tuple
 
 from github import Github
+import yaml
+from collections import OrderedDict
 
 if python_version_tuple()[0] == u'2':
     input = lambda prompt: raw_input(prompt.encode('utf8')).decode('utf8')
@@ -84,6 +86,12 @@ Version: {__version__}
             join = partial(path.join, args.dest)
 
         get_repos = g.get_organization(args.org).get_repos if args.org else g.get_user().get_repos
+
+        yaml.add_representer(UnsortableOrderedDict, yaml.representer.SafeRepresenter.represent_dict)
+
+        project_list = list()
+        projects = UnsortableOrderedDict([("projects", project_list)])
+
         for repo in get_repos():
             if not path.exists(join(repo.name)):
                 clone_url = repo.clone_url
@@ -100,8 +108,40 @@ Version: {__version__}
                 call([u'git', u'pull'], env=dict(environ, GIT_DIR=join(repo.name, '.git').encode('utf8')))
             else:
                 print(u'Already cloned, skipping...\t"{repo.name}"'.format(repo=repo))
+
+            # Guess project build/clean default cmd.
+            build = ""
+            clean = ""
+
+            if path.exists(join(repo.name, "pom.xml")):
+                build = "mvn install"
+                clean = "mvn clean"
+            elif path.exists(join(repo.name, "build.xml")):
+                build = "ant"
+                clean = "ant clean"
+            elif path.exists(join(repo.name, "build.gradle")):
+                build = "gradle"
+                clean = "gradle clean"
+
+            project = UnsortableOrderedDict([
+                ("name", str(repo.name)),
+                ("giturl", str(repo.clone_url)),
+                ("build", build),
+                ("clean", clean)
+            ])
+            project_list.append(project)
+
+        with open("projects.yml", 'w') as yml_file:
+            yml_file.write(yaml.dump(projects, default_flow_style=False))
         print(u'FIN')
 
+class UnsortableList(list):
+    def sort(self, *args, **kwargs):
+        pass
+
+class UnsortableOrderedDict(OrderedDict):
+    def items(self, *args, **kwargs):
+        return UnsortableList(OrderedDict.items(self, *args, **kwargs))
 
 if __name__ == '__main__':
     gitim = Gitim()

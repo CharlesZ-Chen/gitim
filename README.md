@@ -36,6 +36,10 @@
                             [curr_dir]
       --nopull              Don't pull if repository exists. [false]
 
+##### Dependencies
+- PyGithub: `pip install PyGithub`
+- pyYaml: `pip install pyyaml`
+
 ##### Licence
 MIT
 
